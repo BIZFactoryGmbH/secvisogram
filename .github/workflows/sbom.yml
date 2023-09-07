@@ -1,0 +1,62 @@
+name: "SBOM generation"
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build-spdx-sbom-generator:
+    name: "Build spdx-sbom-generator"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          repository: 'opensbom-generator/spdx-sbom-generator'
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '>=1.21.0'
+      - run: make build
+
+      - uses: actions/upload-artifact@master
+        with:
+          name: spdx-sbom-generator
+          path: bin/spdx-sbom-generator
+
+  spdx:
+    name: "SPDX SBOM generation"
+    runs-on: ubuntu-latest
+    needs: build-spdx-sbom-generator
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@master
+        with:
+          name: spdx-sbom-generator
+          path: ./spdx-sbom-generator
+
+      - run: ./spdx-sbom-generator -p . -o . -f json
+      - run: mv bom-npm.json sbom.secvisogram_spdx.json
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: sbom.secvisogram_spdx.json
+
+  cyclonedx:
+    name: "CycloneDX SBOM generation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm i @cyclonedx/bom
+      - run: npx cyclonedx-npm --output-file sbom.secvisogram_cyclonedx.json --output-format json
+
+      - uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: sbom.secvisogram_cyclonedx.json
