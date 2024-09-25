@@ -1,12 +1,10 @@
 import { compose, set } from 'lodash/fp.js'
-import * as basic from '../../../../csaf-validator-lib/basic.js'
+import { getVersionTests } from '../../../../csaf-validator-lib/getVersionTests.js'
 import strip from '../../../../csaf-validator-lib/strip.js'
 import validate from '../../../../csaf-validator-lib/validate.js'
 import doc_max from './Core/doc-max.json'
 import doc_min from './Core/doc-min.json'
 import { DocumentEntity } from './Core/entities.js'
-
-const INSTANT_TESTS = Object.values(basic)
 
 const secvisogramName = 'Secvisogram'
 
@@ -36,9 +34,11 @@ export default function createCore() {
     document: {
       /**
        * Validates the document and returns errors that possibly occur.
+       * The validation is based on the basic tests and the tests of the
+       * corresponding CSAF-version.
        *
        * @param {object} params
-       * @param {{}} params.document
+       * @param {any} params.document
        * @returns {Promise<{
        *   isValid: boolean;
        *   errors: {
@@ -48,7 +48,10 @@ export default function createCore() {
        * }>}
        */
       async validate({ document }) {
-        const res = await validate(INSTANT_TESTS, document)
+        const version = document.document.csaf_version
+        let TESTS = await getVersionTests(version)
+
+        const res = await validate(TESTS, document)
         return {
           isValid: res.isValid,
           errors: res.tests.flatMap((t) => t.errors),
@@ -118,10 +121,11 @@ export default function createCore() {
        * of removed elements.
        *
        * @param {object} params
-       * @param {{}} params.document
+       * @param {any} params.document
        */
       async strip({ document }) {
-        const res = await strip(INSTANT_TESTS, document)
+        const TESTS = await getVersionTests(document.document.csaf_version)
+        const res = await strip(TESTS, document)
 
         return res
       },
